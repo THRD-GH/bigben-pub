@@ -1,0 +1,133 @@
+<!-- Open / closed line for a Google Sites page.
+
+     In the Sites editor: Insert > Embed > Embed code, then paste everything in this file.
+     Set LANG below to "en" on the English page and "de" on the German page.
+     Sites runs embeds inside an iframe, so this cannot affect the rest of the page, and
+     nothing inside it is picked up by the site's own search.
+
+     Sizing: after inserting, drag the embed box to roughly full width and 60px tall. -->
+
+<div id="pubstatus">&nbsp;</div>
+
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  #pubstatus {
+    font: 600 17px/1.4 "Roboto", Arial, Helvetica, sans-serif;
+    color: #202124;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 2px;
+  }
+  #pubstatus .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #80868B; flex: none;
+  }
+  #pubstatus.is-open .dot { background: #1E8E3E; }
+  #pubstatus.is-open .txt { color: #1E8E3E; }
+</style>
+
+<script>
+(function () {
+  var LANG = "en";   /* "en" on the English page, "de" on the German page */
+
+  var hours = {
+    0: [720, 1170],   /* Sunday   12:00 - 19:30 */
+    1: null,          /* Monday   closed */
+    2: [1020, 1350],  /* Tuesday  17:00 - 22:30 */
+    3: [1020, 1350],  /* Wednesday */
+    4: [1020, 1380],  /* Thursday 17:00 - 23:00 */
+    5: [1020, 1410],  /* Friday   17:00 - 23:30 */
+    6: [1020, 1410]   /* Saturday */
+  };
+
+  var days = {
+    en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    de: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"]
+  };
+
+  var say = {
+    en: {
+      open: function (t) { return "Open now until " + t; },
+      today: function (t) { return "Closed. Opens today at " + t; },
+      tomorrow: function (t) { return "Closed. Opens tomorrow at " + t; },
+      later: function (t, d) { return "Closed. Opens " + d + " at " + t; }
+    },
+    de: {
+      open: function (t) { return "Jetzt offen bis " + t + " Uhr"; },
+      today: function (t) { return "Geschlossen. Öffnet heute um " + t + " Uhr"; },
+      tomorrow: function (t) { return "Geschlossen. Öffnet morgen um " + t + " Uhr"; },
+      later: function (t, d) { return "Geschlossen. Öffnet am " + d + " um " + t + " Uhr"; }
+    }
+  };
+
+  var fallback = {
+    en: "Tuesday to Saturday from 17:00. Sunday from 12:00.",
+    de: "Dienstag bis Samstag ab 17:00. Sonntag ab 12:00."
+  };
+
+  function fmt(mins) {
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+
+  function nowZurich() {
+    try {
+      var parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Zurich", weekday: "short",
+        hour: "2-digit", minute: "2-digit", hour12: false
+      }).formatToParts(new Date());
+      var o = {}, i;
+      for (i = 0; i < parts.length; i++) { o[parts[i].type] = parts[i].value; }
+      var map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      var d = map[o.weekday];
+      if (d === undefined) { return null; }
+      var h = parseInt(o.hour, 10) % 24, m = parseInt(o.minute, 10);
+      if (isNaN(h) || isNaN(m)) { return null; }
+      return { d: d, t: h * 60 + m };
+    } catch (e) { return null; }
+  }
+
+  var lang = LANG === "de" ? "de" : "en";
+  var el = document.getElementById("pubstatus");
+  var now = nowZurich();
+  var text, isOpen = false;
+
+  if (!now) {
+    text = fallback[lang];
+  } else {
+    var today = hours[now.d];
+    if (today && now.t >= today[0] && now.t < today[1]) {
+      isOpen = true;
+      text = say[lang].open(fmt(today[1]));
+    } else {
+      var next = null;
+      for (var i = 0; i < 8; i++) {
+        var idx = (now.d + i) % 7, slot = hours[idx];
+        if (!slot) { continue; }
+        if (i === 0) {
+          if (now.t < slot[0]) { next = { idx: idx, open: slot[0], when: "today" }; break; }
+          continue;
+        }
+        next = { idx: idx, open: slot[0], when: i === 1 ? "tomorrow" : "later" };
+        break;
+      }
+      text = next
+        ? (next.when === "later"
+            ? say[lang].later(fmt(next.open), days[lang][next.idx])
+            : say[lang][next.when](fmt(next.open)))
+        : fallback[lang];
+    }
+  }
+
+  el.className = isOpen ? "is-open" : "";
+  el.textContent = "";
+  var dot = document.createElement("span");
+  dot.className = "dot";
+  var txt = document.createElement("span");
+  txt.className = "txt";
+  txt.textContent = text;
+  el.appendChild(dot);
+  el.appendChild(txt);
+})();
+</script>
